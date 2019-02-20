@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/joeshaw/multierror"
@@ -53,6 +54,10 @@ type Config struct {
 	RuleFiles    []string `config:"audit_rule_files"`    // List of rule files.
 	SocketType   string   `config:"socket_type"`         // Socket type to use with the kernel (unicast or multicast).
 
+	// Reload auditd rule files
+	Reload Reload `config:"reload"`
+	mutex  sync.Mutex
+
 	// Tuning options (advanced, use with care)
 	ReassemblerMaxInFlight uint32        `config:"reassembler.max_in_flight"`
 	ReassemblerTimeout     time.Duration `config:"reassembler.timeout"`
@@ -65,6 +70,11 @@ type Config struct {
 	StreamBufferConsumers int    `config:"stream_buffer_consumers"`
 
 	auditRules []auditRule
+}
+
+type Reload struct {
+	Period  time.Duration `config:"period"`
+	Enabled bool          `config:"enabled"`
 }
 
 type auditRule struct {
@@ -90,6 +100,7 @@ var defaultConfig = Config{
 	ReassemblerTimeout:     2 * time.Second,
 	StreamBufferQueueSize:  8192,
 	StreamBufferConsumers:  0,
+	Reload:                 Reload{Enabled: false, Period: 30 * time.Second},
 }
 
 // Validate validates the rules specified in the config.
@@ -118,6 +129,19 @@ func (c *Config) Validate() error {
 // Rules returns a list of rules specified in the config.
 func (c Config) rules() []auditRule {
 	return c.auditRules
+}
+
+func (c *Config) reloadRules() error {
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.auditRules = []auditRule{}
+
+	if err := c.loadRules(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Config) loadRules() error {
