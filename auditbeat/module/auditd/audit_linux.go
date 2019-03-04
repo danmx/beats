@@ -217,14 +217,14 @@ func (ms *MetricSet) Run(reporter mb.PushReporterV2) {
 	wg.Wait()
 }
 
-type Reloader struct {
+type reloader struct {
 	reload Reload
 	pathes []string
 	done   chan struct{}
 	wg     sync.WaitGroup
 }
 
-func NewRuleReloader(pathes []string, reload Reload) *Reloader {
+func NewRuleReloader(pathes []string, reload Reload) *reloader {
 
 	newPathes := []string{}
 
@@ -235,7 +235,7 @@ func NewRuleReloader(pathes []string, reload Reload) *Reloader {
 		newPathes = append(newPathes, path)
 	}
 
-	return &Reloader{
+	return &reloader{
 		reload: reload,
 		pathes: newPathes,
 		done:   make(chan struct{}),
@@ -243,7 +243,7 @@ func NewRuleReloader(pathes []string, reload Reload) *Reloader {
 }
 
 // Run runs the reloader
-func (rl *Reloader) Run(ms *MetricSet, reporter mb.PushReporterV2) {
+func (rl *reloader) Run(ms *MetricSet, reporter mb.PushReporterV2) {
 	ms.log.Info("Auditd Rule reloader started")
 
 	rl.wg.Add(1)
